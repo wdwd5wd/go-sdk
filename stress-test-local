@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# set -ieu
+
+# source ../harmony/scripts/setup_bls_build_flags.sh
+
+sender='one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy'
+receiver='one1pdv9lrdwl0rg5vglh4xtyrv3wjk3wsqket7zxy'
+shard_zero='https://api.s0.b.hmny.io/'
+shard_one='https://api.s0.b.hmny.io/'
+
+direct_node='http://52.27.34.100:9500'
+
+function c {
+    printf "%s\n" "$*" | bc
+}
+
+# Shard 0 to 0
+for iter in $(seq 10000); do
+    rand=$(grep -m1 -ao '[0-9]' /dev/urandom | sed s/0/3/ | head -n1)
+    value=$(c "${iter}/100")
+    bump=$(c "${value}+${rand}")
+    amount=$(printf "%.2f" ${bump})
+    nonce=$(c "${iter}-1")
+    ./hmy \
+	  transfer --from ${sender} --to ${receiver} \
+	  --from-shard 0 --to-shard 1 --amount 0.0001 \
+	  --nonce ${nonce} &
+done

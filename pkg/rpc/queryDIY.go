@@ -3,23 +3,43 @@ package rpc
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 
-	"github.com/valyala/fasthttp"
-
 	"github.com/harmony-one/go-sdk/pkg/common"
+	"github.com/valyala/fasthttp"
 )
 
-var (
-	queryID = 0
-	post    = []byte("POST")
-	// 我改了
-	cli *fasthttp.Client
-)
+// Request processes
+func RequestDIY(method string, node string, params interface{}) (Reply, error) {
+	rpcJSON := make(map[string]interface{})
+	rawReply, err := baseRequestDIY(method, node, params)
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(rawReply, &rpcJSON)
+	if oops := rpcJSON["error"]; oops != nil {
+		errNo := oops.(map[string]interface{})["code"].(float64)
+		errMessage := ""
+		if oops.(map[string]interface{})["message"] != nil {
+			errMessage = oops.(map[string]interface{})["message"].(string)
+		}
+		return nil, ErrorCodeToError(errMessage, errNo)
+	}
+	return rpcJSON, nil
+}
 
-// 他们本身的
-func baseRequest(method string, node string, params interface{}) ([]byte, error) {
+func baseRequestDIY(method string, node string, params interface{}) ([]byte, error) {
+
+	cli = &fasthttp.Client{
+		MaxConnsPerHost: 10000,
+		// ReadTimeout:     100 * time.Millisecond,
+		Dial: func(addr string) (net.Conn, error) {
+			return fasthttp.DialTimeout(addr, time.Duration(60)*time.Second)
+		},
+	}
+
 	requestBody, _ := json.Marshal(map[string]interface{}{
 		"jsonrpc": common.JSONRPCVersion,
 		"id":      strconv.Itoa(queryID),
@@ -33,7 +53,9 @@ func baseRequest(method string, node string, params interface{}) ([]byte, error)
 	req.Header.SetContentType(contentType)
 	req.SetRequestURIBytes([]byte(node))
 	res := fasthttp.AcquireResponse()
-	if err := fasthttp.Do(req, res); err != nil {
+
+	req.SetConnectionClose()
+	if err := cli.Do(req, nil); err != nil {
 		return nil, err
 	}
 	c := res.StatusCode()
@@ -54,30 +76,4 @@ func baseRequest(method string, node string, params interface{}) ([]byte, error)
 	}
 	queryID++
 	return result, nil
-}
-
-// TODO Check if Method known, return error when not known, good intern task
-
-// Request processes
-func Request(method string, node string, params interface{}) (Reply, error) {
-	rpcJSON := make(map[string]interface{})
-	rawReply, err := baseRequest(method, node, params)
-	if err != nil {
-		return nil, err
-	}
-	json.Unmarshal(rawReply, &rpcJSON)
-	if oops := rpcJSON["error"]; oops != nil {
-		errNo := oops.(map[string]interface{})["code"].(float64)
-		errMessage := ""
-		if oops.(map[string]interface{})["message"] != nil {
-			errMessage = oops.(map[string]interface{})["message"].(string)
-		}
-		return nil, ErrorCodeToError(errMessage, errNo)
-	}
-	return rpcJSON, nil
-}
-
-// RawRequest is to sidestep the lifting done by Request
-func RawRequest(method string, node string, params interface{}) ([]byte, error) {
-	return baseRequest(method, node, params)
 }

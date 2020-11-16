@@ -71,12 +71,12 @@ func DoesNamedAccountExist(name string) bool {
 
 // Returns one address for account name if exists
 func AddressFromAccountName(name string) (string, error) {
-	 ks := FromAccountName(name)
-	 // FIXME: Assume 1 account per keystore for now
-	 for _, account := range ks.Accounts() {
-		 return address.ToBech32(account.Address), nil
-	 }
-	 return "", fmt.Errorf("Keystore not found.")
+	ks := FromAccountName(name)
+	// FIXME: Assume 1 account per keystore for now
+	for _, account := range ks.Accounts() {
+		return address.ToBech32(account.Address), nil
+	}
+	return "", fmt.Errorf("Keystore not found.")
 }
 
 // FromAddress will return nil if the bech32 string is not found in the imported accounts
@@ -92,7 +92,6 @@ func FromAddress(bech32 string) *keystore.KeyStore {
 	}
 	return nil
 }
-
 
 func FromAccountName(name string) *keystore.KeyStore {
 	uDir, _ := homedir.Dir()
@@ -116,6 +115,7 @@ func UnlockedKeystore(from, passphrase string) (*keystore.KeyStore, *accounts.Ac
 		return nil, nil, fmt.Errorf("could not find %s in keystore", from)
 	}
 	if unlockError := ks.Unlock(account, passphrase); unlockError != nil {
+		fmt.Println("caonima")
 		return nil, nil, errors.Wrap(NoUnlockBadPassphrase, unlockError.Error())
 	}
 	return ks, &account, nil

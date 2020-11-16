@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/harmony-one/go-sdk/pkg/address"
@@ -17,12 +19,21 @@ import (
 	"github.com/harmony-one/go-sdk/pkg/transaction"
 	"github.com/harmony-one/go-sdk/pkg/validation"
 	"github.com/harmony-one/harmony/accounts"
+	"github.com/harmony-one/harmony/accounts/keystore"
 	"github.com/harmony-one/harmony/core"
 
 	"github.com/spf13/cobra"
 )
 
 const defaultTimeout = 40
+
+var wg = new(sync.WaitGroup)
+
+// 发送的总交易数
+const loop = 1
+
+// 每100ms发送交易数
+const concurrency = 1
 
 var (
 	fromAddress       oneAddress
@@ -357,31 +368,93 @@ Create a transaction, sign it, and send off to the Harmony blockchain
 				}
 				passphrase = pp // needed for passphrase assignment used in handler
 				txLog := transactionLog{}
+
+				// 我改了
 				err = handlerForTransaction(&txLog)
+				// err = handlerForTransactionDIY(&txLog)
+
 				fmt.Println(common.ToJSONUnsafe(txLog, !noPrettyOutput))
 				return err
+
+				// 我改了
 			} else {
-				hasError := false
-				var txLogs []transactionLog
-				for i := range transferFileFlags {
-					var txLog transactionLog
-					err := handlerForBulkTransactions(&txLog, i)
-					txLogs = append(txLogs, txLog)
-					if err != nil {
-						hasError = true
-						if transferFileFlags[i].StopOnError {
-							break
+				runtime.GOMAXPROCS(runtime.NumCPU())
+
+				// wg := new(sync.WaitGroup)
+
+				var ks *keystore.KeyStore
+				var acct *accounts.Account
+				var t1, t2 time.Time
+
+				for iter := 0; iter < loop/concurrency; iter++ {
+					wg.Add(concurrency)
+					t2 = time.Now()
+					for i, txFlag := range transferFileFlags[iter*concurrency : (iter+1)*concurrency] {
+						var txLog transactionLog
+
+						// Set required fields.
+						var fromAddLocal oneAddress
+						err := fromAddLocal.Set(*txFlag.FromAddress)
+						if handlerForError(&txLog, err) != nil {
+							return err
+						}
+
+						if i+iter*concurrency == 0 {
+							t3 := time.Now()
+							ks, acct, err = store.UnlockedKeystore(fromAddLocal.String(), passphrase)
+							unlocktimer := time.Since(t3)
+							fmt.Println("Unlock time:", unlocktimer)
+							println("Start")
+							t1 = time.Now()
+						}
+
+						go func(i int) {
+							err := handlerForBulkTransactionsDIY(&txLog, i+iter*concurrency, ks, acct)
+							if err != nil {
+								fmt.Println("Error on:", i, err)
+							}
+							wg.Done()
+						}(i)
+						if (i+iter*concurrency)%1000 == 0 {
+							fmt.Println(i + iter*concurrency)
 						}
 					}
+					wg.Wait()
+					timer := time.Since(t2)
+					if timer < time.Second {
+						fmt.Println("100 txs time:", timer)
+						time.Sleep(100*time.Millisecond - timer)
+
+					}
 				}
-				fmt.Println(common.ToJSONUnsafe(txLogs, true))
-				if hasError {
-					return fmt.Errorf("one or more of your transactions returned an error " +
-						"-- check the log for more information")
-				} else {
-					return nil
-				}
+				println("Done")
+				elapsed := time.Since(t1)
+				fmt.Println("App elapsed: ", elapsed)
+				return nil
 			}
+
+			// } else {
+			// 	hasError := false
+			// 	var txLogs []transactionLog
+			// 	for i := range transferFileFlags {
+			// 		var txLog transactionLog
+			// 		err := handlerForBulkTransactions(&txLog, i)
+			// 		txLogs = append(txLogs, txLog)
+			// 		if err != nil {
+			// 			hasError = true
+			// 			if transferFileFlags[i].StopOnError {
+			// 				break
+			// 			}
+			// 		}
+			// 	}
+			// 	fmt.Println(common.ToJSONUnsafe(txLogs, true))
+			// 	if hasError {
+			// 		return fmt.Errorf("one or more of your transactions returned an error " +
+			// 			"-- check the log for more information")
+			// 	} else {
+			// 		return nil
+			// 	}
+			// }
 		},
 	}
 

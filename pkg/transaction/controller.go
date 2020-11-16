@@ -49,6 +49,8 @@ type Controller struct {
 	executionError    error
 	transactionErrors Errors
 	messenger         rpc.T
+	// 我改了
+	messengerDIY      rpc.TDIY
 	sender            sender
 	transactionForRPC transactionForRPC
 	chain             common.ChainID
