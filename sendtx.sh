@@ -8,7 +8,7 @@
 
 # wait
 
-# ./hmy --node=http://172.31.20.144:9500 transfer --file testtxs.json &
-# ./hmy --node=http://172.31.20.144:9502 transfer --file testtxs9502.json &
+./hmy --node=http://0.0.0.0:9500 transfer --file testtxs.json &
+./hmy --node=http://0.0.0.0:9501 transfer --file testtxs1.json &
 
-# wait
+wait

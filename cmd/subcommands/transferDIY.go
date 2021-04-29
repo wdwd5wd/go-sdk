@@ -146,7 +146,7 @@ func handlerForTransactionDIY(txLog *transactionLog, fromAddLocal oneAddress, to
 	}
 
 	// 给交易增加负载以增加交易大小
-	size := make([]byte, 300)
+	size := make([]byte, 512*4096)
 
 	var gLimit uint64
 	if gasLimit == "" {

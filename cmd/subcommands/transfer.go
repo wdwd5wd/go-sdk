@@ -30,7 +30,7 @@ const defaultTimeout = 40
 var wg = new(sync.WaitGroup)
 
 // 发送的总交易数
-const loop = 1
+const loop = 12
 
 // 每100ms发送交易数
 const concurrency = 1
@@ -421,9 +421,9 @@ Create a transaction, sign it, and send off to the Harmony blockchain
 					}
 					wg.Wait()
 					timer := time.Since(t2)
-					if timer < time.Second {
+					if timer < 20*time.Second {
 						fmt.Println("100 txs time:", timer)
-						time.Sleep(100*time.Millisecond - timer)
+						time.Sleep(20*time.Second - timer)
 
 					}
 				}
